@@ -1,0 +1,17 @@
+langchain
+langchain-community
+langchain-core
+langchain-classic
+langchain-groq
+langchain-huggingface
+langchain-qdrant
+qdrant-client
+beautifulsoup4
+unstructured
+streamlit
+ragas
+python-dotenv
+tiktoken
+lxml
+lark
+sentence-transformers
