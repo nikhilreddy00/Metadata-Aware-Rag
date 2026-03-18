@@ -127,6 +127,40 @@ def format_chat_history(messages):
         history += f"{role}: {msg['content']}\n"
     return history
 
+def multi_query_retrieve(question, retriever, llm, k=2):
+    """
+    Multi-Query Retrieval:
+    Generates alternative questions to maximize semantic recall, then runs them through our
+    Self-Query Retriever, returning the top unique documents.
+    """
+    # 1. Generate versions
+    prompt = ChatPromptTemplate.from_template(
+        "You are an AI language model assistant. Your task is to generate 2 "
+        "different versions of the given user question to retrieve relevant documents from a vector database. "
+        "Provide these alternative questions separated by newlines, do not number them.\n\n"
+        "Original question: {question}"
+    )
+    chain = prompt | llm | StrOutputParser()
+    response = chain.invoke({"question": question})
+    
+    # 2. Extract and combine with original
+    queries = [q.strip() for q in response.split("\n") if q.strip()]
+    queries = [question] + queries
+    logger.info(f"Generated multi-queries: {queries}")
+    
+    # 3. Retrieve and Deduplicate
+    unique_docs = {}
+    for q in queries:
+        try:
+            docs = retriever.invoke(q)
+            for doc in docs:
+                unique_docs[doc.page_content] = doc
+        except Exception as e:
+            logger.warning(f"Error during retrieval for '{q}': {e}")
+            
+    # 4. Return top K
+    return list(unique_docs.values())[:k]
+
 def build_rag_chain(retriever, llm):
     qa_template = """You are a financial analyst expert.
     Use the following pieces of retrieved context from SEC filings to answer the question. 
@@ -187,7 +221,9 @@ if prompt := st.chat_input("Ask about filings (e.g., 'What supply chain risks di
             standalone_question = prompt
             
             if history_str.strip():
-                condense_template = """Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question.
+                condense_template = """Given the following conversation history and a follow-up question, rephrase the follow-up question to be a fully standalone question. 
+                CRITICAL: You MUST retain all specific entities (like the Company Name and Year) mentioned in the history if the follow-up question refers to them implicitly (e.g., using words like "it", "they", "then", "this year").
+
                 Conversation History:
                 {chat_history}
                 Follow Up Input: {question}
@@ -205,8 +241,8 @@ if prompt := st.chat_input("Ask about filings (e.g., 'What supply chain risks di
             rag_chain = build_rag_chain(retriever, llm)
             
             try:
-                # 1. Self-Query Retriever fetches specifically filtered documents
-                source_docs = retriever.invoke(standalone_question)
+                # 1. Multi-Query + Self-Query Retrieval fetching specifically filtered documents
+                source_docs = multi_query_retrieve(standalone_question, retriever, llm, k=2)
                 
                 # 2. Format context explicitly
                 formatted_context = ""
