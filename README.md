@@ -1,10 +1,25 @@
 # 📈 Metadata-Aware RAG with Self-Querying (SEC EDGAR)
 
-An end-to-end, production-ready Retrieval-Augmented Generation (RAG) system built over financial documents (SEC EDGAR HTML filings). This project distinguishes itself from standard semantic search by utilizing a **Self-Querying Retriever** and a **Metadata-Aware Vector Database (Qdrant)** to achieve 100% precision on filtered queries (such as querying by specific company or year) while maintaining chat history.
+An end-to-end, production-ready Retrieval-Augmented Generation (RAG) system built to handle complex financial documents (SEC EDGAR HTML filings). 
+
+This project goes beyond standard semantic search by utilizing advanced retrieval techniques—specifically a **Self-Querying Retriever** and a custom **Multi-Query Retriever** pipeline—backed by a **Metadata-Aware Vector Database (Qdrant)**. This architecture achieves unmatched precision on computationally tricky queries (e.g., fetching data strictly from a specific company or year).
+
+## 🧠 Advanced Retrieval Architecture
+
+### 1. Self-Querying Retrieval
+Standard RAG fails when a user asks: *"What were Apple's supply chain risks in 2022?"* The embedding model gets confused by the strict noun ("Apple") and integer ("2022") constraints. 
+**The Solution:** We use a high-parameter LLM (`llama-3.3-70b-versatile`) to translate the natural language question into an exact structured Qdrant metadata payload filter *before* performing the vector search.
+* **Benefit:** 100% precision on filtered queries. If the user asks for 2022 Apple data, the database physically ignores all other documents.
+
+### 2. Multi-Query Retrieval
+Semantic search relies on distance metrics, which means slight phrasing differences can cause the database to miss the best source document.
+**The Solution:** Before querying, an LLM rewrites the user's base question from multiple distinct semantic perspectives. All variations are searched simultaneously, and the results are deduplicated.
+* **Benefit:** Drastically higher recall rates. We configure this pipeline to extract the **Top K=2** most unique and relevant chunk proofs, guaranteeing a highly-focused, hallucination-free answer.
 
 ## 🚀 Key Features
 
-*   **Self-Querying Retrieval:** Uses Groq's `llama-3.3-70b-versatile` to translate natural language user questions into exact structured Qdrant metadata payload filters.
+*   **Self-Querying Retrieval:** Translates natural language user questions into exact structured Qdrant metadata payload filters.
+*   **Multi-Query Retrieval:** Synthesizes multiple query variations to maximize context recall and deduplicates for the Top K=2 best proofs.
 *   **Conversational Memory (History-Aware):** An intelligent pre-processing chain condenses follow-up questions containing pronouns (e.g., "What were the risks in 2023?") into standalone queries before searching.
 *   **Robust HTML Ingestion:** Processes highly-complex SEC EDGAR filings cleanly by utilizing LangChain's `HTMLHeaderTextSplitter`. It preserves the semantic `<h>` tagging hierarchy rather than arbitrarily slicing paragraphs.
 *   **Dynamic Multi-Dataset Parsing:** Automatically extracts metadata (`Company`, `Year`, `Form Type`) directly from HTML file names and content during the ingestion phase.
