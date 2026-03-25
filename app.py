@@ -22,18 +22,29 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables (GROQ_API_KEY)
+# Load environment variables (GROQ_API_KEY) — works locally; Streamlit Cloud uses st.secrets
 load_dotenv()
 
 # --- Configurations ---
 COLLECTION_NAME = "dynamic_sec_filings"
 QDRANT_PATH = "./qdrant_db"
 
+def get_secret(key):
+    """Retrieve a secret from env vars (local) or Streamlit secrets (cloud)."""
+    value = os.getenv(key)
+    if not value:
+        try:
+            value = st.secrets.get(key)
+        except Exception:
+            pass
+    return value
+
 def init_components():
     """Initialize the LLM, Embeddings, and Vector Store."""
-    if not os.getenv("GROQ_API_KEY"):
-        st.error("GROQ_API_KEY is not set. Please update your .env file.")
+    if not get_secret("GROQ_API_KEY"):
+        st.error("GROQ_API_KEY is not set. Add it to your .env file (local) or Streamlit Cloud secrets.")
         st.stop()
+    os.environ["GROQ_API_KEY"] = get_secret("GROQ_API_KEY")
         
     # 1. Embeddings (Free local HF)
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")

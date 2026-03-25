@@ -3,3 +3,5 @@ __pycache__/
 .env
 .DS_Store
 ragas_evaluation_report.csv
+.streamlit/secrets.toml
+qdrant_db/.lock
